@@ -1,0 +1,91 @@
+<!-- members/templates/members/print_badges.html -->
+{% load static %}
+{% load custom_filters %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Badges</title>
+    <style>
+        .badge-container {
+            {% comment %} background-image: url("{% static 'img/denim.png' %}"); {% endcomment %}
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .badge {
+            width: 250px;
+            height: 300px;
+            border: 1px solid #000;
+            padding: 20px;
+            text-align: center;
+            font-family: Arial, sans-serif;
+            page-break-inside: avoid;
+        }
+        
+        .badge img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .badge-name {
+            margin-top: 30px;
+            font-size: 18px;
+            font-weight: bold;
+        
+            word-break: break-all;
+             
+            color: #666; 
+            background: #f8f9fa; 
+            padding: 5px; 
+            border: 1px solid #eee; 
+            border-radius: 4px; 
+            text-align: center;
+        }
+        
+        @media print {
+            .badge-container {
+                page-break-inside: avoid;
+            }
+            .badge {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1 style="text-align:center;">Member Badges</h1>
+    <div class="badge-container">
+        {% for member in members %}
+    <div class="badge" style="position: relative;">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={{ member.qr_data|urlencode }}" alt="QR Code">
+        
+        <!-- Hidden input with the data for easy copy-paste -->
+        <input type="text" value="{{ member.qr_data }}" style="position: absolute; opacity: 0; width: 1px; height: 1px;" id="qr_data_{{ member.id }}" name="qr_data_{{ member.id }}">
+        
+        <div class="badge-name" style="font-size: 14px; margin: 5px 0;">{{ member.first_name }} {{ member.last_name }}</div>
+        <div style="display: flex; justify-content: space-between; margin: 5px 0; font-size: 12px;">
+            <span><strong>Room:</strong> {{ member.room }}</span>
+            <span><strong>Div:</strong> {{ member.division }}</span>
+        </div>
+        {% if member.allergies and member.allergies != 'None' %}
+        <div style="font-size: 12px; margin-top: 5px; color: #d32f2f;">
+            <strong>Allergies:</strong> {{ member.allergies }}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    </div>
+
+    <script>
+        window.print(); // Automatically trigger the print dialog
+    </script>
+</body>
+
+</html>

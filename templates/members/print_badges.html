@@ -4,87 +4,193 @@
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Print Badges</title>
     <style>
-        .badge-container {
-            {% comment %} background-image: url("{% static 'img/denim.png' %}"); {% endcomment %}
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 20px;
+        @page {
+            size: 3.5in 4.5in;
+            margin: 0;
         }
-        
-        .badge {
-            width: 250px;
-            height: 300px;
-            border: 1px solid #000;
-            padding: 20px;
-            text-align: center;
+        body {
+            margin: 0;
+            padding: 0;
             font-family: Arial, sans-serif;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .badge-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(3.5in, 1fr));
+            gap: 0.25in;
+            padding: 0.25in;
+        }
+        .badge {
+            width: 3.5in;
+            height: 4.5in;
+            position: relative;
+            overflow: hidden;
+            break-inside: avoid;
             page-break-inside: avoid;
+            margin: 0 auto;
+            background: white;
+            background-image: url('{% static 'images/camp-tag2.png' %}');
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
         }
-        
-        .badge img {
-            max-width: 100%;
-            height: auto;
+        .badge-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;  /* Changed from cover to contain */
+            z-index: 1;
         }
-        
-        .badge-name {
-            margin-top: 30px;
+        .badge-header {
+            position: absolute;
+            top: 15px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            font-size: 10px;
+            text-transform: uppercase;
+            z-index: 2;
+        }
+        .header {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            z-index: 3;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 10px;
+            z-index: 1;
+        }
+        .content {
+            position: relative;
+            height: 100%;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+        .qr-code-container {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 80px;
+            height: 80px;
+            background: white;
+            padding: 5px;
+        }
+        .qr-code-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .details {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            text-align: right;
+            max-width: 60%;
+        }
+        .name {
             font-size: 18px;
             font-weight: bold;
-        
-            word-break: break-all;
-             
-            color: #666; 
-            background: #f8f9fa; 
-            padding: 5px; 
-            border: 1px solid #eee; 
-            border-radius: 4px; 
-            text-align: center;
+            margin-bottom: 10px;
+            color: #333;
+            text-transform: uppercase;
         }
-        
+        .info {
+            font-size: 14px;
+            margin: 4px 0;
+            color: #333;
+        }
+        .footer {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            font-size: 9px;
+            z-index: 2;
+        }
         @media print {
-            .badge-container {
-                page-break-inside: avoid;
+            @page {
+                size: 8.27in 11.69in;  /* Standard letter size */
+                margin: 0.5in;     /* Equal margins on all sides */
+                padding: 0;
+            }
+            body {
+                margin: 0 auto;
+                padding: 0;
+                width: 3.5in;
+                height: 4.5in;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                display: flex;
+                justify-content: center;
+                align-items: center;
             }
             .badge {
+                width: 3.5in !important;
+                height: 4.5in !important;
+                margin: 0 auto !important;
+                position: relative !important;
                 page-break-inside: avoid;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
         }
     </style>
 </head>
 
 <body>
-    <h1 style="text-align:center;">Member Badges</h1>
     <div class="badge-container">
         {% for member in members %}
-    <div class="badge" style="position: relative;">
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={{ member.qr_data|urlencode }}" alt="QR Code">
-        
-        <!-- Hidden input with the data for easy copy-paste -->
-        <input type="text" value="{{ member.qr_data }}" style="position: absolute; opacity: 0; width: 1px; height: 1px;" id="qr_data_{{ member.id }}" name="qr_data_{{ member.id }}">
-        
-        <div class="badge-name" style="font-size: 14px; margin: 5px 0;">{{ member.first_name }} {{ member.last_name }}</div>
-        <div style="display: flex; justify-content: space-between; margin: 5px 0; font-size: 12px;">
-            <span><strong>Room:</strong> {{ member.room }}</span>
-            <span><strong>Div:</strong> {{ member.division }}</span>
+        <div class="badge">
+            <!-- Member Details on the left -->
+            <div style="position: absolute; left: 20px; top: 80%; transform: translateY(-50%); z-index: 2; color: #333; width: 55%;">
+                <div style="font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #1a237e; text-transform: uppercase;">{{ member.first_name|upper }} {{ member.last_name|upper }}</div>
+                <div style="font-size: 13px; margin: 6px 0; color: #333;"><strong>ROOM:</strong> {{ member.room|default:'-'|upper }}</div>
+                <div style="font-size: 13px; margin: 6px 0; color: #333;"><strong>DIVISION:</strong> {{ member.division|default:'-'|upper }}</div>
+                {% if member.allergies and member.allergies != 'None' %}
+                <div style="font-size: 12px; color: #d32f2f; font-weight: bold; margin-top: 10px;"><strong>ALLERGIES:</strong>HAS ALLERGIES</div>
+                {% else %}
+                <div style="font-size: 12px; color: #333; margin-top: 10px;"><strong>ALLERGIES:</strong> NONE</div>
+                {% endif %}
+            </div>
+            
+            <!-- QR Code on the right -->
+            <div style="position: absolute; right: 26px; top: 82%; transform: translateY(-50%); width: 100px; height: 100px; background: white; display: flex; align-items: center; justify-content: center; z-index: 2;  box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={{ member.qr_data|urlencode }}" alt="QR Code" style="width: 100%; height: 100%; object-fit: contain;">
+                <input type="text" value="{{ member.qr_data }}" style="position: absolute; opacity: 0; width: 1px; height: 1px;" id="qr_data_{{ member.id }}" name="qr_data_{{ member.id }}">
+            </div>
         </div>
-        {% if member.allergies and member.allergies != 'None' %}
-        <div style="font-size: 12px; margin-top: 5px; color: #d32f2f;">
-            <strong>Allergies:</strong> {{ member.allergies }}
-        </div>
-        {% endif %}
-    </div>
-    {% endfor %}
+        {% endfor %}
     </div>
 
     <script>
-        window.print(); // Automatically trigger the print dialog
+        // Print dialog will be triggered automatically
+        window.onload = function() {
+            setTimeout(function() {
+                window.print();
+                // Optional: Close the window after printing
+                // window.onafterprint = function() {
+                //     window.close();
+                // };
+            }, 500);
+        };
     </script>
 </body>
 

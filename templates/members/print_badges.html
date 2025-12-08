@@ -127,29 +127,49 @@
         }
         @media print {
             @page {
-                size: 8.27in 11.69in;  /* Standard letter size */
-                margin: 0.5in;     /* Equal margins on all sides */
+                size: 8.27in 11.69in;  /* A4 size */
+                margin: 0.25in;        /* Reduced margins to fit more content */
                 padding: 0;
             }
-            body {
-                margin: 0 auto;
+            body, html {
+                margin: 0;
                 padding: 0;
-                width: 3.5in;
-                height: 4.5in;
+                width: 100%;
+                height: 100%;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
-                display: flex;
-                justify-content: center;
-                align-items: center;
+            }
+            .badge-container {
+                display: grid !important;
+                grid-template-columns: repeat(2, 1fr);
+                grid-template-rows: repeat(2, 1fr);
+                width: 7.77in;  /* 8.27in - 2*0.25in margins */
+                height: 11.19in; /* 11.69in - 2*0.25in margins */
+                gap: 0.1in;
+                padding: 0.25in;
+                box-sizing: border-box;
+                page-break-after: always;
             }
             .badge {
-                width: 3.5in !important;
-                height: 4.5in !important;
-                margin: 0 auto !important;
-                position: relative !important;
+                width: 3.7in !important;
+                height: 5.3in !important;
+                margin: 0 !important;
+                position: relative;
                 page-break-inside: avoid;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+                transform: scale(0.95); /* Slight scaling to ensure fit */
+                transform-origin: top left;
+            }
+            /* Ensure content stays within badge */
+            .badge > div {
+                max-width: 100%;
+                box-sizing: border-box;
+            }
+            
+            /* Add page break after every 4 badges */
+            .badge:nth-child(4n) {
+                page-break-after: always;
             }
         }
     </style>
@@ -161,7 +181,7 @@
         <div class="badge">
             <!-- Member Details on the left -->
             <div style="position: absolute; left: 20px; top: 80%; transform: translateY(-50%); z-index: 2; color: #333; width: 55%;">
-                <div style="font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #1a237e; text-transform: uppercase;">{{ member.first_name|upper }} {{ member.last_name|upper }}</div>
+                <div style="font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #1a237e; text-transform: uppercase;">{{ member.first_name|upper }} {{ member.last_name|upper }}</div>
                 <div style="font-size: 13px; margin: 6px 0; color: #333;"><strong>ROOM:</strong> {{ member.room|default:'-'|upper }}</div>
                 <div style="font-size: 13px; margin: 6px 0; color: #333;"><strong>DIVISION:</strong> {{ member.division|default:'-'|upper }}</div>
                 {% if member.allergies and member.allergies != 'None' %}
@@ -172,7 +192,7 @@
             </div>
             
             <!-- QR Code on the right -->
-            <div style="position: absolute; right: 26px; top: 82%; transform: translateY(-50%); width: 100px; height: 100px; background: white; display: flex; align-items: center; justify-content: center; z-index: 2;  box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="position: absolute; right: 15px; top: 82.5%; transform: translateY(-50%); width: 125px; height: 115px; display: flex; align-items: center; justify-content: center; z-index: 2;  box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={{ member.qr_data|urlencode }}" alt="QR Code" style="width: 100%; height: 100%; object-fit: contain;">
                 <input type="text" value="{{ member.qr_data }}" style="position: absolute; opacity: 0; width: 1px; height: 1px;" id="qr_data_{{ member.id }}" name="qr_data_{{ member.id }}">
             </div>

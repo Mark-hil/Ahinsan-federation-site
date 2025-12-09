@@ -65,7 +65,16 @@ class EmailOrUsernameAuthenticationForm(AuthenticationForm):
                     user = User.objects.get(email__iexact=username)
                     self.user_cache = authenticate(username=user.username, password=password)
                     if self.user_cache is not None:
-                        self.confirm_login_allowed(self.user_cache)
+                        try:
+                            self.confirm_login_allowed(self.user_cache)
+                        except forms.ValidationError as e:
+                            # Check if the user is inactive
+                            if not self.user_cache.is_active:
+                                raise forms.ValidationError(
+                                    _("This account is inactive. Please check your email to activate your account."),
+                                    code='inactive',
+                                )
+                            raise
                 except User.DoesNotExist:
                     pass
             
@@ -79,6 +88,15 @@ class EmailOrUsernameAuthenticationForm(AuthenticationForm):
                         params={'username': self.username_field.verbose_name},
                     )
                 else:
-                    self.confirm_login_allowed(self.user_cache)
+                    try:
+                        self.confirm_login_allowed(self.user_cache)
+                    except forms.ValidationError as e:
+                        # Check if the user is inactive
+                        if not self.user_cache.is_active:
+                            raise forms.ValidationError(
+                                _("This account is inactive. Please check your email to activate your account."),
+                                code='inactive',
+                            )
+                        raise
         
         return self.cleaned_data

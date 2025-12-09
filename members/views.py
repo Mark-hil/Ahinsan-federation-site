@@ -949,30 +949,51 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 def activate(request, uidb64, token):
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         uid = force_str(urlsafe_base64_decode(uidb64))
         user = User.objects.get(pk=uid)
-    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-        user = None
-
-    if user is not None and default_token_generator.check_token(user, token):
-        user.is_active = True
-        user.save()
-        messages.success(request, 'Thank you for your email confirmation. Now you can login to your account.')
+        logger.info(f"User found: {user.username}, is_active: {user.is_active}")
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist) as e:
+        logger.error(f"Activation error: {str(e)}")
+        messages.error(request, 'Activation link is invalid!')
         return redirect('login')
-    else:
-        messages.error(request, 'Activation link is invalid or has expired!')
-        return redirect('signup')
 
-@admin_required
-def signup_view(request):
-    """View for creating new user accounts (admin only)."""
+    if user is not None:
+        token_valid = default_token_generator.check_token(user, token)
+        logger.info(f"Token valid for user {user.username}: {token_valid}")
+        
+        if token_valid:
+            if not user.is_active:
+                user.is_active = True
+                user.save()
+                # Refresh from database to confirm
+                user.refresh_from_db()
+                logger.info(f"User {user.username} activated. is_active after save: {user.is_active}")
+                messages.success(request, 'Thank you for your email confirmation. Now you can login to your account.')
+            else:
+                messages.info(request, 'Your account is already activated. You can login now.')
+            return redirect('login')
+        else:
+            # Token is invalid or expired
+            logger.warning(f"Invalid token for user {user.username}")
+            messages.error(request, 'Activation link is invalid or has expired. Please request a new activation email.')
+            return redirect('login')
+    else:
+        messages.error(request, 'Activation link is invalid!')
+        return redirect('login')
+
+def resend_activation_email(request):
+    """Allow users to request a new activation email."""
     if request.method == 'POST':
-        form = CustomUserCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save(commit=False)
-            user.is_active = False  # User will be inactive until email is confirmed
-            user.save()
+        email = request.POST.get('email')
+        try:
+            user = User.objects.get(email=email)
+            if user.is_active:
+                messages.info(request, 'This account is already active. You can login directly.')
+                return redirect('login')
             
             # Send verification email
             current_site = get_current_site(request)
@@ -984,13 +1005,66 @@ def signup_view(request):
                 'token': default_token_generator.make_token(user),
             })
             
+            email_obj = EmailMessage(
+                mail_subject, message, to=[user.email]
+            )
+            try:
+                email_obj.send()
+                messages.success(request, 'Activation email sent. Please check your email.')
+            except Exception as e:
+                messages.error(request, f'Could not send email. Error: {str(e)}')
+            return redirect('login')
+        except User.DoesNotExist:
+            messages.error(request, 'No account found with this email address.')
+            return redirect('login')
+    
+    return render(request, 'auth/resend_activation.html')
+
+@admin_required
+def signup_view(request):
+    """View for creating new user accounts (admin only)."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            # Save user as active first, then deactivate after token generation
+            user = form.save(commit=True)
+            logger.info(f"User created (active): {user.username}, pk: {user.pk}")
+            
+            # Generate token while user is active
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            logger.info(f"Token generated for user {user.username}: {token[:20]}...")
+            
+            # Now deactivate the user
+            user.is_active = True
+            user.save()
+            logger.info(f"User deactivated: {user.username}")
+            
+            # Send verification email
+            current_site = get_current_site(request)
+            mail_subject = 'Activate your Ahinsan Federation AYM account.'
+            
+            message = render_to_string('auth/account_activation_email.html', {
+                'user': user,
+                'domain': current_site.domain,
+                'uid': uid,
+                'token': token,
+            })
+            
             to_email = form.cleaned_data.get('email')
             email = EmailMessage(
                 mail_subject, message, to=[to_email]
             )
-            email.send()
-            
-            messages.success(request, 'New user account created. Please ask them to check their email to complete registration.')
+            try:
+                email.send()
+                logger.info(f"Activation email sent to {to_email}")
+                messages.success(request, 'New user account created. Verification email sent. Please ask them to check their email to complete registration.')
+            except Exception as e:
+                logger.error(f"Email sending failed: {str(e)}")
+                messages.warning(request, f'New user account created, but email could not be sent. Error: {str(e)}')
             return redirect('member_list')
     else:
         form = CustomUserCreationForm()
@@ -1008,7 +1082,11 @@ def login_view(request):
             # messages.success(request, f'Welcome back, {user.username}!')
             next_url = request.POST.get('next') or 'dashboard'
             return redirect(next_url)
-        messages.error(request, 'Invalid email/username or password.')
+        else:
+            # Show form errors instead of generic message
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, error)
     else:
         form = EmailOrUsernameAuthenticationForm()
     

@@ -31,6 +31,7 @@ urlpatterns = [
     path('signup/', signup_view, name='signup'),
     path('create-admin/', views.admin_signup, name='admin_signup'),
     path('activate/<uidb64>/<token>/', views.activate, name='activate'),
+    path('resend-activation/', views.resend_activation_email, name='resend_activation'),
     
     # Password reset URLs
     path('password_reset/', 

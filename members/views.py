@@ -1,10 +1,12 @@
 # members/views.py
-from datetime import datetime
+from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from django.contrib.auth.decorators import login_required
+from django.http import HttpResponseForbidden
+from .decorators import admin_required
 from django.contrib import messages
+from .forms import AdminSignupForm
 from .models import AttendanceSetting, Member, generate_qr_code_for_attendance
 # from django.shortcuts import render
 from .forms import FollowUpForm, MemberForm, MemberEditForm
@@ -36,11 +38,13 @@ from django.shortcuts import render, redirect, get_object_or_404
 from .models import AttendanceSetting
 from .forms import AttendanceSettingForm
 
+@login_required
 def scanner(request):
     return render(request, 'members/scanner.html')
 
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
+@login_required
 def member_list(request):
     from django.utils import timezone
     from datetime import timedelta
@@ -157,6 +161,7 @@ def member_list(request):
 
 import logging
 
+@login_required
 def add_member(request):
     logger = logging.getLogger(__name__)
     logger.info("Add member view called")
@@ -237,6 +242,7 @@ def add_member(request):
     return render(request, 'members/add_member.html', {'form': form})
 
 
+@login_required
 def edit_member(request, pk):
     member = get_object_or_404(Member, pk=pk)
     
@@ -268,6 +274,7 @@ def edit_member(request, pk):
 from django.db import transaction
 from django.contrib import messages
 
+@login_required
 def delete_member(request, pk):
     try:
         with transaction.atomic():
@@ -282,6 +289,7 @@ def delete_member(request, pk):
         return redirect('member_list')
 
 
+@login_required
 def export_members_csv(request):
     # Create the HTTP response object with the CSV file
     response = HttpResponse(content_type='text/csv')
@@ -322,6 +330,7 @@ def export_members_csv(request):
     return response
 
 
+@login_required
 def track_attendance(request):
 #     qr_code_data = request.GET.get('data')
 #     if qr_code_data:
@@ -362,6 +371,7 @@ def attendance_report(request):
 
 
 
+@login_required
 def mark_attendance(request):
     # Initialize variables
     member_id = None
@@ -600,6 +610,7 @@ def attendance_report(request):
     return render(request, 'members/attendance_report.html', context)
 
 
+@login_required
 def export_attendance_report(request):
     # Create the HttpResponse object with the appropriate CSV header.
     response = HttpResponse(content_type='text/csv')
@@ -645,6 +656,7 @@ def export_attendance_report(request):
 
 
 
+@login_required
 def set_attendance_type(request):
     if request.method == 'POST':
         form = AttendanceSettingForm(request.POST)
@@ -662,6 +674,7 @@ def set_attendance_type(request):
     return render(request, 'members/set_attendance_type.html', {'form': form, 'current_setting': current_setting})
 
 
+@login_required
 def print_badges(request):
     # Get all members with related room data
     members = Member.objects.select_related('room').all()
@@ -687,6 +700,7 @@ def print_badges(request):
 
 
 
+@login_required
 def view_qr_code(request, member_id):
     """Retrieve and serve the QR code from PostgreSQL as an image."""
     member = get_object_or_404(Member, id=member_id)
@@ -823,6 +837,7 @@ def view_qr_code(request, member_id):
 from .models import Visitor
 from .forms import VisitorForm
 
+@login_required
 def add_visitor(request):
     if request.method == 'POST':
         form = VisitorForm(request.POST)
@@ -833,12 +848,13 @@ def add_visitor(request):
         form = VisitorForm()
     return render(request, 'visitors/add_visitor.html', {'form': form})
 
+@login_required
 def visitor_list(request):
     visitors = Visitor.objects.all()
     return render(request, 'visitors/visitor_list.html', {'visitors': visitors})
 
 
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMessage
 from django.conf import settings
 
 def send_welcome_email(visitor):
@@ -849,6 +865,7 @@ def send_welcome_email(visitor):
 
 
 
+@login_required
 def follow_up_visitor(request, pk):
     visitor = get_object_or_404(Visitor, pk=pk)
     
@@ -862,6 +879,21 @@ def follow_up_visitor(request, pk):
         form = FollowUpForm(instance=visitor)
     
     return render(request, 'visitors/follow_up_visitor.html', {'form': form})
+
+@login_required
+@admin_required
+def admin_signup(request):
+    """View for creating new admin accounts (superuser only)."""
+    if request.method == 'POST':
+        form = AdminSignupForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            messages.success(request, f'Successfully created admin account for {user.username}')
+            return redirect('member_list')
+    else:
+        form = AdminSignupForm()
+    
+    return render(request, 'registration/admin_signup.html', {'form': form})
 
 @login_required
 def dashboard(request):
@@ -894,6 +926,7 @@ def dashboard(request):
         'visitors_today': visitors_today,
         'trend_labels': json.dumps(trend_dates),
         'trend_data': json.dumps(trend_data),
+        'user': request.user,  # Ensure user is in context
     }
 
     return render(request, 'members/dashboard.html', context)
@@ -904,16 +937,61 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from .authentication_forms import CustomUserCreationForm, EmailOrUsernameAuthenticationForm
 
+from django.contrib.sites.shortcuts import get_current_site
+from django.template.loader import render_to_string
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+def activate(request, uidb64, token):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user is not None and default_token_generator.check_token(user, token):
+        user.is_active = True
+        user.save()
+        messages.success(request, 'Thank you for your email confirmation. Now you can login to your account.')
+        return redirect('login')
+    else:
+        messages.error(request, 'Activation link is invalid or has expired!')
+        return redirect('signup')
+
+@admin_required
 def signup_view(request):
+    """View for creating new user accounts (admin only)."""
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
-            user.email = form.cleaned_data['email']  # Make sure email is saved
+            user.is_active = False  # User will be inactive until email is confirmed
             user.save()
-            login(request, user)
-            messages.success(request, 'Account created successfully!')
-            return redirect('dashboard')
+            
+            # Send verification email
+            current_site = get_current_site(request)
+            mail_subject = 'Activate your Ahinsan Federation AYM account.'
+            message = render_to_string('auth/account_activation_email.html', {
+                'user': user,
+                'domain': current_site.domain,
+                'uid': urlsafe_base64_encode(force_bytes(user.pk)),
+                'token': default_token_generator.make_token(user),
+            })
+            
+            to_email = form.cleaned_data.get('email')
+            email = EmailMessage(
+                mail_subject, message, to=[to_email]
+            )
+            email.send()
+            
+            messages.success(request, 'New user account created. Please ask them to check their email to complete registration.')
+            return redirect('member_list')
     else:
         form = CustomUserCreationForm()
     return render(request, 'auth/signup.html', {'form': form})
@@ -927,7 +1005,7 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            messages.success(request, f'Welcome back, {user.username}!')
+            # messages.success(request, f'Welcome back, {user.username}!')
             next_url = request.POST.get('next') or 'dashboard'
             return redirect(next_url)
         messages.error(request, 'Invalid email/username or password.')

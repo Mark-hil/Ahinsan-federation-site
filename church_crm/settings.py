@@ -59,8 +59,12 @@ DEBUG = config("DEBUG", cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS").split(",")
 CORS_ORIGIN_ALLOW_ALL = True 
 
-# Site framework settings
+# Site settings
 SITE_ID = 1
+
+# Site domain configuration
+SITE_DOMAIN = config('SITE_DOMAIN', default='localhost:8000')
+SITE_NAME = config('SITE_NAME', default='Ahinsan Federation AYM')
 
 # No expiration for QR codes - they'll be permanent until user is deleted
 
@@ -71,9 +75,9 @@ INSTALLED_APPS = [
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
-    'django.contrib.sites',  # Required for the sites framework
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',  # Add this line
     'django.contrib.humanize',  # Required for intcomma filter
     'members',
     'widget_tweaks',
@@ -89,6 +93,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'members.middleware.LoginRequiredMiddleware',  # Custom middleware for requiring login
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
 ]
@@ -131,6 +136,11 @@ DATABASES['default'] = dj_database_url.parse(config("DATABASE_URL"))
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
+# Authentication settings
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'dashboard'
+LOGOUT_REDIRECT_URL = 'login'
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -156,6 +166,15 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
+# Email settings
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=False, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=config('EMAIL_HOST_USER', default='noreply@ahinsanfederation.org'))
 
 
 # Email verification settings
@@ -164,9 +183,13 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 7
 ACCOUNT_EMAIL_CONFIRMATION_ANONYMOUS_REDIRECT_URL = '/login/'
 ACCOUNT_EMAIL_CONFIRMATION_AUTHENTICATED_REDIRECT_URL = '/dashboard/'
+ACCOUNT_EMAIL_SUBJECT_PREFIX = 'Ahinsan Federation AYM '
 
 # Password reset settings
 PASSWORD_RESET_TIMEOUT = 86400  # 1 day in seconds
+
+# Error handlers
+handler403 = 'members.views.permission_denied_view'
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/

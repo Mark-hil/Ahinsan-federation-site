@@ -117,8 +117,49 @@
 
 from django import forms
 from django.conf import settings
-from .models import Member, Visitor, AttendanceSetting
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import UserCreationForm
 from django.core.mail import send_mail
+from .models import Member, Visitor, AttendanceSetting
+
+class AdminSignupForm(UserCreationForm):
+    email = forms.EmailField(required=True, widget=forms.EmailInput(attrs={
+        'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500',
+        'placeholder': 'Email address',
+        'required': 'required'
+    }))
+    first_name = forms.CharField(required=True, widget=forms.TextInput(attrs={
+        'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500',
+        'placeholder': 'First name',
+        'required': 'required'
+    }))
+    last_name = forms.CharField(required=True, widget=forms.TextInput(attrs={
+        'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500',
+        'placeholder': 'Last name',
+        'required': 'required'
+    }))
+
+    class Meta:
+        model = get_user_model()
+        fields = ('username', 'email', 'first_name', 'last_name', 'password1', 'password2')
+        widgets = {
+            'username': forms.TextInput(attrs={
+                'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500',
+                'placeholder': 'Username',
+                'required': 'required'
+            }),
+        }
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.email = self.cleaned_data['email']
+        user.first_name = self.cleaned_data['first_name']
+        user.last_name = self.cleaned_data['last_name']
+        user.is_staff = True
+        user.is_superuser = True
+        if commit:
+            user.save()
+        return user
 
 # Member Form for creating and editing members
 class MemberForm(forms.ModelForm):

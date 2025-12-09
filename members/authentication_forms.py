@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
@@ -63,16 +63,15 @@ class EmailOrUsernameAuthenticationForm(AuthenticationForm):
             if '@' in username:
                 try:
                     user = User.objects.get(email__iexact=username)
-                    self.user_cache = self.confirm_login_allowed(
-                        self.user_cache if self.user_cache is not None 
-                        else self.authenticate(username=user.username, password=password)
-                    )
+                    self.user_cache = authenticate(username=user.username, password=password)
+                    if self.user_cache is not None:
+                        self.confirm_login_allowed(self.user_cache)
                 except User.DoesNotExist:
                     pass
             
             # If email authentication failed, try with username
             if self.user_cache is None:
-                self.user_cache = self.authenticate(username=username, password=password)
+                self.user_cache = authenticate(username=username, password=password)
                 if self.user_cache is None:
                     raise forms.ValidationError(
                         self.error_messages['invalid_login'],

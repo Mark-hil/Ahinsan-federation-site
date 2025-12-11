@@ -131,7 +131,7 @@ DATABASES = {
     }
 }
 
-DATABASES['default'] = dj_database_url.parse(config("DATABASE_URL"))
+# DATABASES['default'] = dj_database_url.parse(config("DATABASE_URL"))
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -256,3 +256,6 @@ LOGGING = {
     },
 }
 
+# In settings.py, add these lines at the bottom
+ARKESEL_API_KEY = config('ARKESEL_API_KEY')
+ARKESEL_SENDER_ID = config('ARKESEL_SENDER_ID')

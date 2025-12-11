@@ -14,6 +14,7 @@ from .forms import FollowUpForm, MemberForm, MemberEditForm
 from django.template.loader import render_to_string
 from django.http import HttpResponse
 from .models import Member
+from .utils.sms import send_sms
 import csv
 import json
 
@@ -217,6 +218,31 @@ def add_member(request):
                     logger.error(f"Error generating QR code: {str(e)}")
                     # Save member without QR code if there's an error
                     member.save()
+                
+                # Send welcome SMS with room and division details
+                try:
+                    # Format the welcome message with emojis and clear sections
+                    message = (
+                        f"Welcome to Ahinsan Youth Federation!\n\n"
+                        f"Dear {member.first_name} {member.last_name},\n\n"
+                        f"Thank you for registering for the 2025 Annual Youth Camp! "
+                        f"Here are your assigned room and division details:\n\n"
+                        f"Room: {member.room.name if member.room else 'To be assigned'}\n"
+                        f"Division: {member.division if member.division else 'To be assigned'}\n\n"
+                        f"We look forward to seeing you at the camp!\n\n"
+                        f"Best regards,\n"
+                        f"Ahinsan Youth Federation Team"
+                    )
+                    
+                    if member.phone_number:
+                        sms_sent = send_sms(member.phone_number, message)
+                        if sms_sent:
+                            logger.info(f"Welcome SMS sent to {member.phone_number}")
+                        else:
+                            logger.warning(f"Failed to send welcome SMS to {member.phone_number}")
+                except Exception as e:
+                    logger.error(f"Error sending welcome SMS: {str(e)}")
+                    # Don't fail the member creation if SMS fails
                 
                 logger.info("Member saved successfully, redirecting...")
                 return redirect('member_list')

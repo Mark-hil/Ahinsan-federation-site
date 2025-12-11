@@ -16,3 +16,5 @@ sqlparse
 typing_extensions
 tzdata
 whitenoise
+arkesel_python
+requests

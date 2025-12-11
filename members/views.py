@@ -316,6 +316,7 @@ def delete_member(request, pk):
 
 
 @login_required
+@user_passes_test(lambda u: u.is_staff, login_url='member_list')
 def export_members_csv(request):
     # Create the HTTP response object with the CSV file
     response = HttpResponse(content_type='text/csv')
@@ -701,6 +702,7 @@ def set_attendance_type(request):
 
 
 @login_required
+@user_passes_test(lambda u: u.is_staff, login_url='member_list')
 def print_badges(request):
     # Get all members with related room data
     members = Member.objects.select_related('room').all()

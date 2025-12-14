@@ -4,7 +4,7 @@ import random
 from datetime import date, timedelta
 
 class Command(BaseCommand):
-    help = 'Populate the database with 100 test members'
+    help = 'Populate the database with 100 test members and assign rooms and divisions'
 
     def handle(self, *args, **options):
         first_names = ['John', 'Jane', 'Michael', 'Emily', 'David', 'Sarah', 'Robert', 'Lisa', 
@@ -14,7 +14,7 @@ class Command(BaseCommand):
                      'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson']
         
         professions = ['Teacher', 'Engineer', 'Doctor', 'Lawyer', 'Business Owner', 
-                     'Artist', 'Scientist', 'Mathematician', 'Historian', 'Psychologist']
+                      'Artist', 'Scientist', 'Mathematician', 'Historian', 'Psychologist']
         
         # Create rooms if they don't exist
         if not Room.objects.exists():
@@ -26,38 +26,47 @@ class Command(BaseCommand):
                 Room.objects.create(name=constellation, capacity=40)
         
         self.stdout.write("Creating test members...")
+        rooms = list(Room.objects.all())
         
         for i in range(1, 101):
             first_name = random.choice(first_names)
             last_name = random.choice(last_names)
             email = f"{first_name.lower()}.{last_name.lower()}{i}@example.com"
             
-            # Generate a random date of birth between 18 and 80 years ago
-            start_date = date.today() - timedelta(days=80*365)
-            end_date = date.today() - timedelta(days=18*365)
-            random_days = random.randint(0, (end_date - start_date).days)
-            dob = start_date + timedelta(days=random_days)
-            
-            member = Member.objects.create(
+            # Create member with required fields first
+            member = Member(
                 first_name=first_name,
                 last_name=last_name,
                 email=email,
                 phone_number=f"233{random.randint(200000000, 299999999)}",
-                address=f"{random.randint(1, 1000)} Test St, City {random.randint(1, 10)}",
+                address=f"{random.randint(1, 1000)} {random.choice(['Main', 'Oak', 'Pine', 'Maple', 'Cedar'])} St",
                 guardian_name=f"Guardian {last_name}",
                 guardian_phone_number=f"233{random.randint(200000000, 299999999)}",
-                date_of_birth=dob,
+                date_of_birth=date.today() - timedelta(days=random.randint(18*365, 70*365)),
                 gender=random.choice(['male', 'female']),
                 profession=random.choice(professions),
-                allergies=random.choice(['', 'Peanuts', 'Dust', 'Pollen', '']),
-                nhis_number=f"NHIS{random.randint(1000000000, 9999999999)}" if random.random() > 0.3 else '',
-                church=random.choice(['', 'First Baptist', 'St. Mary', 'Grace Community', '']),
-                district=random.choice(['', 'Accra', 'Kumasi', 'Tamale', 'Cape Coast', ''])
+                allergies="None" if random.random() > 0.1 else "Peanuts, Dairy",
+                nhis_number=f"NHIS{random.randint(1000000, 9999999)}",
+                church=random.choice(['Central', 'North', 'South', 'East', 'West']),
+                district=random.choice(['Accra', 'Kumasi', 'Tamale', 'Cape Coast', 'Takoradi'])
             )
             
-            # The save() method will handle room assignment automatically
+            # Save the member first to get an ID
+            member.save()
+            
+            # Now explicitly assign room and division
+            try:
+                # This will also assign a division
+                member.assign_room(save=True)
+                
+                # Double-check division was assigned
+                if not member.division:
+                    member.assign_division(save=True)
+                    self.stdout.write(f"Assigned division {member.division} to member {member.id} in post-processing")
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f"Error assigning room to member {member.id}: {str(e)}"))
             
             if i % 10 == 0:
                 self.stdout.write(f"Created {i} members...")
         
-        self.stdout.write(self.style.SUCCESS(f'Successfully created 100 test members'))
+        self.stdout.write(self.style.SUCCESS(f'Successfully created {i} test members with rooms and divisions'))

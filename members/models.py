@@ -179,52 +179,77 @@ class Member(models.Model):
     
     def assign_division(self, save=True):
         """
-        Assign this member to a division (1-4) with less than 200 members.
-        Ensures no other members in the same room are in the same division.
+        Assign this member to a division (1-4) with balanced distribution.
+        Ensures no other members in the same room are in the same division,
+        and limits the number of members from the same church/district in a division.
         """
         from django.db.models import Count, Q
-        
-        # If already assigned to a division, keep it
+        from collections import defaultdict
+
         if self.division:
             return self.division
-            
-        # Get division counts (divisions with less than 200 members)
-        division_counts = Member.objects.values('division').annotate(
-            count=Count('id')
-        ).filter(count__lt=200).order_by('count')
+
+        divisions = [1, 2, 3, 4]
         
-        # Get divisions that don't have members from this member's room
+        # Get divisions already used in this room
+        used_divisions = set()
         if self.room:
-            used_divisions = Member.objects.filter(
-                room=self.room
-            ).exclude(division__isnull=True).values_list('division', flat=True).distinct()
-            available_divisions = [d for d in range(1, 5) if d not in used_divisions]
-        else:
-            available_divisions = list(range(1, 5))
+            used_divisions = set(Member.objects.filter(
+                room=self.room,
+                division__isnull=False
+            ).exclude(pk=self.pk).values_list('division', flat=True))
+
+        # Get division counts for all divisions
+        division_counts = {d: 0 for d in divisions}
+        counts = Member.objects.values('division').annotate(
+            count=Count('id')
+        ).filter(division__isnull=False)
+
+        for item in counts:
+            division_counts[item['division']] = item['count']
+
+        # Get church/district distribution in each division
+        church_district_divisions = defaultdict(int)
+        if self.church and self.district:
+            # Count how many from same church/district are in each division
+            church_district_counts = Member.objects.filter(
+                church=self.church,
+                district=self.district
+            ).exclude(pk=self.pk).values('division').annotate(
+                count=Count('id')
+            )
+            for item in church_district_counts:
+                church_district_divisions[item['division']] = item['count']
+
+        # Find available divisions (not used in this room)
+        available_divisions = [d for d in divisions if d not in used_divisions]
         
-        # Find the first available division with the fewest members
-        assigned_division = None
-        
-        # First try to find a division that's both available and has the fewest members
-        for div in division_counts.order_by('count'):
-            if div['division'] in available_divisions:
-                assigned_division = div['division']
-                break
-                
-        # If no division found (all have 200+ members or none available), find any available division
-        if not assigned_division and available_divisions:
-            assigned_division = available_divisions[0]
-        
-        # If still no division (shouldn't happen unless all divisions have 200+ members)
-        if not assigned_division:
-            assigned_division = 1  # Fallback to division 1 if all else fails
+        # If no available divisions, use all divisions (shouldn't happen with 4 divisions)
+        if not available_divisions:
+            available_divisions = divisions
+
+        # Score each division (lower is better)
+        division_scores = {}
+        for div in available_divisions:
+            # Base score is the current division count
+            score = division_counts.get(div, 0)
             
-        self.division = assigned_division
-        
+            # Add penalty for church/district concentration
+            if div in church_district_divisions:
+                # Increase score based on how many from same church/district are already in this division
+                score += church_district_divisions[div] * 5  # 5x weight to prioritize spreading out same church/district
+            
+            division_scores[div] = score
+
+        # Choose division with lowest score
+        chosen_division = min(division_scores.items(), key=lambda x: x[1])[0]
+
+        self.division = chosen_division
+
         if save:
             self.save(update_fields=['division'])
-            
-        return assigned_division
+        
+        return chosen_division
         
     def assign_room(self, save=True):
         """

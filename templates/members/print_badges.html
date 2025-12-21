@@ -184,11 +184,11 @@
                 <div style="font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #1a237e; text-transform: uppercase;">{{ member.first_name|upper }} {{ member.last_name|upper }}</div>
                 <div style="font-size: 13px; margin: 6px 0; color: #333;"><strong>ROOM:</strong> {{ member.room|default:'-'|upper }}</div>
                 <div style="font-size: 13px; margin: 6px 0; color: #333;"><strong>DIVISION:</strong> {{ member.division|default:'-'|upper }}</div>
-                {% if member.allergies and member.allergies != 'None' %}
+                <!-- {% if member.allergies and member.allergies != 'None' %}
                 <div style="font-size: 12px; color: #d32f2f; font-weight: bold; margin-top: 10px;"><strong>ALLERGIES:</strong>HAS ALLERGIES</div>
                 {% else %}
                 <div style="font-size: 12px; color: #333; margin-top: 10px;"><strong>ALLERGIES:</strong> NONE</div>
-                {% endif %}
+                {% endif %} -->
             </div>
             
             <!-- QR Code on the right -->
